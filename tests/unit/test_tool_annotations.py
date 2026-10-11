@@ -123,7 +123,7 @@ class TestRegistryResolution:
 
         assert _registry["add"]["destructive_hint"] is False
 
-    def test_read_tool_destructive_hint_is_none(self, clean_registry):
+    def test_read_tool_registry_destructive_hint_is_none(self, clean_registry):
         @Tool("r", "desc", title="Read Tool")
         def r() -> dict:
             return {}
@@ -183,6 +183,7 @@ class TestRegisteredAnnotations:
         assert tool["annotations"] == {
             "title": "Read Tool",
             "readOnlyHint": True,
+            "destructiveHint": False,
             "openWorldHint": False,
         }
 
@@ -231,31 +232,38 @@ def test_every_real_tool_has_complete_annotations(tools_list):
             problems.append(f"{tool.name}: readOnlyHint not a bool")
         if not isinstance(ann.get("openWorldHint"), bool):
             problems.append(f"{tool.name}: openWorldHint not a bool")
-        if ann.get("readOnlyHint") is False:
-            if not isinstance(ann.get("destructiveHint"), bool):
-                problems.append(f"{tool.name}: write tool without destructiveHint")
-        elif "destructiveHint" in ann:
-            problems.append(f"{tool.name}: read-only tool carries destructiveHint")
+        if not isinstance(ann.get("destructiveHint"), bool):
+            problems.append(f"{tool.name}: destructiveHint not a bool")
+        elif ann.get("readOnlyHint") is True and ann["destructiveHint"] is not False:
+            problems.append(f"{tool.name}: read-only tool with destructiveHint != False")
     assert not problems, "\n".join(problems)
 
 
 @pytest.mark.parametrize(
     ("name", "read_only", "destructive", "open_world"),
     [
-        ("find_notes", True, None, False),
-        ("list_decks", True, None, False),
+        ("find_notes", True, False, False),
+        ("list_decks", True, False, False),
         ("add_note", False, False, False),
         ("delete_notes", False, True, False),
         ("sync", False, True, True),
         ("store_media_file", False, False, True),
         ("gui_undo", False, True, False),
+        ("tag_list", True, False, False),
+        ("filtered_deck_get_info", True, False, False),
+        ("tag_add", False, False, False),
+        ("filtered_deck_rebuild", False, False, False),
+        ("filtered_deck_upsert", False, True, False),
+        ("card_forget", False, True, False),
+        ("card_set_due_date", False, True, False),
+        ("card_reposition", False, True, False),
     ],
 )
 def test_real_tool_spot_checks(tools_list, name, read_only, destructive, open_world):
     tool = next(t for t in tools_list if t.name == name)
     ann = _wire(tool)["annotations"]
     assert ann["readOnlyHint"] is read_only
-    assert ann.get("destructiveHint") is destructive
+    assert ann["destructiveHint"] is destructive
     assert ann["openWorldHint"] is open_world
 
 
@@ -264,7 +272,23 @@ _IDEMPOTENT_TOOLS_DESTRUCTIVE_HINT = {
     "delete_notes": True,
     "delete_media_file": True,
     "set_fsrs_params": True,
-    "tag_management": True,
+    "card_change_deck": False,
+    "card_bury": False,
+    "card_unbury": False,
+    "card_suspend": False,
+    "card_unsuspend": False,
+    "card_set_flag": False,
+    "tag_add": False,
+    "tag_remove": True,
+    "tag_replace": True,
+    "tag_clear_unused": True,
+    "tag_batch": True,
+    "filtered_deck_empty": False,
+    "filtered_deck_delete": True,
+    "model_field_add": True,
+    "model_field_rename": True,
+    "model_field_reposition": True,
+    "model_field_remove": True,
 }
 
 
@@ -294,6 +318,12 @@ def test_idempotent_tools_wire_shape(tools_list, name, destructive):
         "update_note_fields",
         "update_model_styling",
         "update_model_templates",
+        # Random order / range / position: a repeat call can differ.
+        "card_reposition",
+        "card_set_due_date",
+        "card_forget",
+        "filtered_deck_upsert",
+        "filtered_deck_rebuild",
     ],
 )
 def test_idempotent_hint_absent(tools_list, name):
@@ -306,3 +336,31 @@ def test_only_the_declared_tools_are_idempotent(tools_list):
         t.name for t in tools_list if "idempotentHint" in _wire(t)["annotations"]
     }
     assert declared == set(_IDEMPOTENT_TOOLS_DESTRUCTIVE_HINT)
+
+
+# Must match the `destructive_hint` bullet in CLAUDE.md.
+_NON_DESTRUCTIVE_WRITE_TOOLS = {
+    "add_note",
+    "add_notes",
+    "create_deck",
+    "create_model",
+    "store_media_file",
+    "tag_add",
+    "card_bury",
+    "card_unbury",
+    "card_suspend",
+    "card_unsuspend",
+    "card_set_flag",
+    "card_change_deck",
+    "filtered_deck_empty",
+    "filtered_deck_rebuild",
+}
+
+
+def test_only_the_declared_write_tools_are_non_destructive(tools_list):
+    declared = set()
+    for t in tools_list:
+        ann = _wire(t)["annotations"]
+        if ann["readOnlyHint"] is False and ann["destructiveHint"] is False:
+            declared.add(t.name)
+    assert declared == _NON_DESTRUCTIVE_WRITE_TOOLS
