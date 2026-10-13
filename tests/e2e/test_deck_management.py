@@ -44,8 +44,16 @@ def _deck_names() -> set[str]:
     return {d["name"] for d in call_tool("list_decks")["decks"]}
 
 
+def _create_deck(deck_name: str) -> int:
+    """create_deck caps nesting at 2 levels -- fail loudly on a setup error
+    instead of letting it surface as a confusing failure further down."""
+    result = call_tool("create_deck", {"deck_name": deck_name})
+    assert result.get("isError") is not True, f"setup: create_deck failed: {result}"
+    return result["deckId"]
+
+
 def _add_note(deck_name: str, uid: str) -> int:
-    call_tool("create_deck", {"deck_name": deck_name})
+    _create_deck(deck_name)
     result = call_tool("add_note", {
         "deck_name": deck_name,
         "model_name": "Basic",
@@ -64,16 +72,16 @@ class TestDeckToolsRevealed:
 class TestDeckRename:
     def test_rename_moves_subdecks_and_cards(self):
         uid = unique_id()
-        old = f"E2E::DMOld{uid}"
+        old = f"E2E_DMOld{uid}"
         note_id = _add_note(f"{old}::Child", uid)
 
-        new = f"E2E::DMMoved{uid}::Renamed"
+        new = f"E2E_DMMoved{uid}::Renamed"
         result = call_tool("deck_rename", {"deck_name": old, "new_name": new})
 
         assert result.get("isError") is not True, result
         assert result["renamed"] is True
         assert result["new_name"] == new
-        assert result["parent_decks_created"] == [f"E2E::DMMoved{uid}"]
+        assert result["parent_decks_created"] == [f"E2E_DMMoved{uid}"]
         assert [s["new_name"] for s in result["subdecks_renamed"]] == [f"{new}::Child"]
 
         names = _deck_names()
@@ -86,7 +94,7 @@ class TestDeckRename:
     def test_case_only_rename(self):
         uid = unique_id()
         old = f"E2E::dmcase{uid}"
-        call_tool("create_deck", {"deck_name": old})
+        _create_deck(old)
 
         result = call_tool("deck_rename", {"deck_name": old, "new_name": f"E2E::DMCASE{uid}"})
 
@@ -96,7 +104,7 @@ class TestDeckRename:
     def test_same_name_is_a_no_op(self):
         uid = unique_id()
         name = f"E2E::DMSame{uid}"
-        call_tool("create_deck", {"deck_name": name})
+        _create_deck(name)
 
         result = call_tool("deck_rename", {"deck_name": name, "new_name": name})
 
@@ -108,8 +116,8 @@ class TestDeckRename:
         uid = unique_id()
         source = f"E2E::DMSrc{uid}"
         taken = f"E2E::DMTaken{uid}"
-        call_tool("create_deck", {"deck_name": source})
-        call_tool("create_deck", {"deck_name": taken})
+        _create_deck(source)
+        _create_deck(taken)
 
         result = call_tool("deck_rename", {"deck_name": source, "new_name": taken.lower()})
 
@@ -122,7 +130,7 @@ class TestDeckRename:
     def test_move_into_own_subdeck_refused(self):
         uid = unique_id()
         name = f"E2E::DMLoop{uid}"
-        call_tool("create_deck", {"deck_name": name})
+        _create_deck(name)
 
         result = call_tool("deck_rename", {"deck_name": name, "new_name": f"{name}::Inner"})
 
@@ -139,7 +147,7 @@ class TestDeckRename:
     def test_empty_name_part_refused(self):
         uid = unique_id()
         name = f"E2E::DMParts{uid}"
-        call_tool("create_deck", {"deck_name": name})
+        _create_deck(name)
 
         result = call_tool("deck_rename", {"deck_name": name, "new_name": "E2E::::Broken"})
 
@@ -149,8 +157,8 @@ class TestDeckRename:
 class TestDeckDeleteEmpty:
     def test_dry_run_then_delete_empty_tree(self):
         uid = unique_id()
-        root = f"E2E::DMEmpty{uid}"
-        call_tool("create_deck", {"deck_name": f"{root}::Sub"})
+        root = f"E2E_DMEmpty{uid}"
+        _create_deck(f"{root}::Sub")
 
         preview = call_tool("deck_delete_empty", {"deck_name": root, "dry_run": True})
         assert preview.get("isError") is not True, preview
@@ -170,7 +178,7 @@ class TestDeckDeleteEmpty:
 
     def test_deck_with_card_in_subdeck_refused(self):
         uid = unique_id()
-        root = f"E2E::DMFull{uid}"
+        root = f"E2E_DMFull{uid}"
         note_id = _add_note(f"{root}::Child", uid)
 
         result = call_tool("deck_delete_empty", {"deck_name": root})
