@@ -122,6 +122,17 @@ class TestOptInToolsHiddenByDefault:
                 f"enabled_opt_in_tools lists it. Found: {sorted(tool_names)}"
             )
 
+    def test_opt_in_deck_tools_absent(self):
+        """deck_rename / deck_delete_empty change the deck tree, so they ship
+        hidden as well. Their REVEAL half and behavioral coverage live in
+        test_deck_management.py (filtered server, port 3142)."""
+        tool_names = {t["name"] for t in list_tools()}
+        for name in ("deck_rename", "deck_delete_empty"):
+            assert name not in tool_names, (
+                f"'{name}' is opt-in and must stay hidden unless "
+                f"enabled_opt_in_tools lists it. Found: {sorted(tool_names)}"
+            )
+
     def test_pre_existing_gui_tools_unaffected(self):
         """The opt-in gate must not have swept up pre-existing GUI tools --
         only the two brand-new ones added alongside it are opt_in=True."""

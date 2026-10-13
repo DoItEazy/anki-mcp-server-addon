@@ -12,6 +12,8 @@
   ],
   "enabled_opt_in_tools": [
     "gui_deck_review",
-    "gui_answer_card"
+    "gui_answer_card",
+    "deck_rename",
+    "deck_delete_empty"
   ]
 }

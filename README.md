@@ -34,6 +34,7 @@ A second native dependency, `rpds` (from `rpds-py`), is handled the same way —
 - **Field management** - Add, rename, and reposition note-type fields via the `model_field_*` tools (with an opt-in [destructive](#destructive-tools-opt-in) `model_field_remove`)
 - **Bulk card stats** - The read-only `cards_stats` tool returns compact per-card scheduling metrics (type/queue/interval/tags/`dueToday`) for a whole deck including subdecks, FSRS-independent — a lean bulk read for analytics
 - **GUI review sessions** - Hands-free review in Anki's own reviewer window: `gui_deck_review` opens a deck, `gui_answer_card` presses the answer button for you. [Opt-in](#opt-in-tools), hidden until named in `enabled_opt_in_tools`
+- **Deck tree management** - `deck_rename` renames a deck or moves it to a new `::` path, subdecks included; `deck_delete_empty` deletes a deck only when no card would be lost with it (Anki deletes a deck's cards along with the deck). [Opt-in](#opt-in-tools), hidden until named in `enabled_opt_in_tools`
 - **MCP tool annotations** - Every tool declares a `title`, `readOnlyHint`, `destructiveHint` and `openWorldHint` (plus `idempotentHint` on write tools that are safe to repeat), so clients can show readable names and confirm before data-changing calls
 - **Cross-platform** - Works on macOS, Windows, and Linux (x64 and ARM)
 
@@ -345,7 +346,7 @@ Some tools ship **hidden from AI clients by default** for reasons other than "de
 - `disabled_tools` still applies on top — an opted-in tool can still be disabled
 - Entries that don't match anything, or match a non-opt-in tool, produce console warnings
 
-Currently shipped opt-in entries: `gui_deck_review` and `gui_answer_card` — the GUI hands-free review-session tools.
+Currently shipped opt-in entries: `gui_deck_review` and `gui_answer_card` — the GUI hands-free review-session tools; `deck_rename` and `deck_delete_empty` — the deck tree tools.
 
 ### Custom Path
 
@@ -481,7 +482,7 @@ Optional hardening via config:
 
 Every tool parameter carries a short `description` in the MCP input schema (since 0.29.0), so clients that show or feed the schema to the model get argument shapes without trial and error. Nested objects (e.g. `tag_batch` operations, `filtered_deck_upsert` search terms) are described on their Pydantic models and appear under `$defs`.
 
-Every tool also carries MCP annotations (since 0.31.0): a human-readable `title`, `readOnlyHint` (true for tools that never modify the collection), `destructiveHint` (false for read-only tools and for writes that are reversible and lose no data: `add_note`, `add_notes`, `create_deck`, `create_model`, `store_media_file`, `tag_add`, `card_bury`, `card_unbury`, `card_suspend`, `card_unsuspend`, `card_set_flag`, `card_change_deck`, `filtered_deck_empty` and `filtered_deck_rebuild`; true for every other write tool, i.e. those that delete, overwrite or irreversibly change data, or force a full AnkiWeb sync), `idempotentHint` (since 0.32.0; true only for write tools where repeating the same call has no further effect: `create_deck`, `delete_notes`, `delete_media_file`, `set_fsrs_params`, `card_change_deck`, `card_bury`, `card_unbury`, `card_suspend`, `card_unsuspend`, `card_set_flag`, every `tag_*` write tool, `filtered_deck_empty`, `filtered_deck_delete` and every `model_field_*` write tool; omitted on every other tool), and `openWorldHint` (true only for `sync`, which talks to AnkiWeb, and `store_media_file`, which can fetch URLs).
+Every tool also carries MCP annotations (since 0.31.0): a human-readable `title`, `readOnlyHint` (true for tools that never modify the collection), `destructiveHint` (false for read-only tools and for writes that are reversible and lose no data: `add_note`, `add_notes`, `create_deck`, `create_model`, `store_media_file`, `tag_add`, `card_bury`, `card_unbury`, `card_suspend`, `card_unsuspend`, `card_set_flag`, `card_change_deck`, `filtered_deck_empty` and `filtered_deck_rebuild`; true for every other write tool, i.e. those that delete, overwrite or irreversibly change data, or force a full AnkiWeb sync), `idempotentHint` (since 0.32.0; true only for write tools where repeating the same call has no further effect: `create_deck`, `delete_notes`, `delete_media_file`, `set_fsrs_params`, `card_change_deck`, `card_bury`, `card_unbury`, `card_suspend`, `card_unsuspend`, `card_set_flag`, every `tag_*` write tool, `filtered_deck_empty`, `filtered_deck_delete`, `deck_rename`, `deck_delete_empty` and every `model_field_*` write tool; omitted on every other tool), and `openWorldHint` (true only for `sync`, which talks to AnkiWeb, and `store_media_file`, which can fetch URLs).
 
 **Upgrading from ≤ 0.27.x:** `get_due_cards` no longer returns `back` unless you pass `include_answer=true`, and `front` is now the rendered question HTML rather than the raw field. Clients that read `back` from this tool need the flag.
 
@@ -492,6 +493,8 @@ Every tool also carries MCP annotations (since 0.31.0): a human-readable `title`
 | `sync` | Synchronize collection with AnkiWeb (asynchronous job: `sync()` starts a sync, `sync(job_id)` polls its status, `sync(job_id, resolve=...)` resolves a full-sync conflict) |
 | `list_decks` | List all decks in the collection |
 | `create_deck` | Create a new deck |
+| `deck_rename` | Rename a deck or move it to a new `::` path; subdecks move along, missing parents are created. Refuses names that already exist (Anki would silently add a `+`) and moves into the deck's own subtree. [Opt-in](#opt-in-tools) |
+| `deck_delete_empty` | Delete a deck and its subdecks only if they hold no cards — counting cards a filtered deck has borrowed, which Anki would delete too. Refuses the Default deck and filtered decks; `dry_run` previews. [Opt-in](#opt-in-tools) |
 | `find_notes` | Search for notes using Anki's search syntax. `include_first_field=true` adds a `noteLabels` array (`{noteId, firstField, truncated, fullLength}`) so you can search and label notes in one call |
 | `notes_info` | Get detailed information about notes. `excerpt_chars` caps every field value at that many characters, marking each with `truncated`/`fullLength` — a cheap way to survey many notes |
 | `add_note` | Add a new note to a deck |

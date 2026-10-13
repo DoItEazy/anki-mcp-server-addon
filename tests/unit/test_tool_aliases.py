@@ -301,7 +301,7 @@ class TestRealRegistryGates:
 
     def test_opt_in_set(self, real_mcp):
         assert {n for n, m in _registry.items() if m["opt_in"]} == {
-            "gui_deck_review", "gui_answer_card",
+            "gui_deck_review", "gui_answer_card", "deck_rename", "deck_delete_empty",
         }
 
     def test_model_field_remove_hidden_by_default(self, real_mcp):

@@ -285,6 +285,10 @@ _IDEMPOTENT_TOOLS_DESTRUCTIVE_HINT = {
     "tag_batch": True,
     "filtered_deck_empty": False,
     "filtered_deck_delete": True,
+    # Renames are kept destructiveHint=True like model_field_rename: searches
+    # that mention the old name silently stop matching.
+    "deck_rename": True,
+    "deck_delete_empty": True,
     "model_field_add": True,
     "model_field_rename": True,
     "model_field_reposition": True,
